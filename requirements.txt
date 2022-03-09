@@ -1,0 +1,11 @@
+pip==21.0.1
+setuptools==56.0.0
+wheel==0.36.2
+transformers[sentencepiece]
+datasets
+scikit-learn
+numpy
+scipy
+autopep8
+torch
+sentence_transformers
