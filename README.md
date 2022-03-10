@@ -2,7 +2,7 @@
 
 This repository demonstrates that for at least one intent classification dataset (banking77), the pretraining available in a widely distributed transformer 
 model gets within ~ 1.7% of the accuracy available with extensive fine-tuning. The practical convenience of being able to use a community model 
-very likely outweighs benefit of the extra accuracy that is obtained from the fine-tuning process. It is probably worth trying 
+very likely outweighs the benefit of the extra accuracy that is obtained from the fine-tuning process. It is probably worth trying 
 the approach used here whenever attempting a new intent classification task.
 
 The banking77 dataset is a standard benchmark for intent classification in dialogue. The strongest 

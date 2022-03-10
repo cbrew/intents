@@ -9,3 +9,4 @@ scipy
 autopep8
 torch
 sentence_transformers
+pandas
