@@ -111,3 +111,28 @@ balance_not_updated_after_cheque_or_cash_deposit    1.00000   0.97500   0.98734 
                                        macro avg    0.92861   0.92695   0.92668      3080
                                     weighted avg    0.92861   0.92695   0.92668      3080
 ```
+
+A more detailed investigation reveals that several sentence transformer models have essentially the same
+property as `all-mpnet-base-v2`, providing good embeddings for banking77 sentences out-of-the-box. The corresponding
+base models (which are well documented at Huggingface), do not.
+
+Default models:
+
+- sentence-transformers/all-MiniLM-L6-v2 
+  - nreimers/MiniLM-L6-H384-uncased (base model for above)
+- sentence-transformers/all-mpnet-base-v2
+  - microsoft/mpnet-base (base model for above)
+- sentence-transformers/all-distilroberta-v1
+  - distilroberta-base (base model for above)
+- sentence-transformers/all-MiniLM-L12-v2
+  - microsoft/MiniLM-L12-H384-uncased (base model for above)
+- sentence-transformers/all-roberta-large-v1
+  - roberta-large (base model for above)
+
+
+Extra models: 
+
+- sentence-transformers/multi-qa-mpnet-base-dot-v1  (base is mpnet)
+- sentence-transformers/paraphrase-multilingual-mpnet-base-v2 (base is mpnet)
+- sentence-transformers/multi-qa-distilbert-cos-v1 (base is distilbert)
+- sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (base is MiniLM-L12)
