@@ -6,6 +6,16 @@ import numpy as np
 from datasets import load_metric
 import os
 
+
+class AdaptedTrainer(transformers.Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        if return_outputs:
+            loss,outputs = super().compute_loss(model,inputs,return_outputs=True)
+            return loss,outputs
+        else:
+            return super().compute_loss(model,inputs,return_outputs=False)
+        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model",type=str,default='sentence-transformers/all-MiniLM-L6-v2')
@@ -21,7 +31,6 @@ if __name__ == "__main__":
     labels = dataset['train'].features['label'].names
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
     model = transformers.AutoModelForSequenceClassification.from_pretrained(model_name,
-                                                                            output_hidden_states=True,
                                                                             num_labels=len(labels))
     def tokenize_function(examples):
         return tokenizer(examples['text'],padding='max_length',truncation=True)
@@ -32,7 +41,7 @@ if __name__ == "__main__":
     small_eval_dataset = tokenized_datasets["test"].shuffle(seed=42)
 
     
-    outdir = f"{model_name}/{dataset_name}/{wandb.run.name}/{wandb.run.id}"
+    outdir = f"models/{model_name}/{dataset_name}/{wandb.run.name}/{wandb.run.id}"
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     training_args = transformers.TrainingArguments(
@@ -41,7 +50,7 @@ if __name__ == "__main__":
         evaluation_strategy="epoch",
         save_strategy="epoch",
         save_steps=5000,
-        seed=seed,
+        seed=args.seed,
         save_total_limit=5,
         warmup_ratio= 0.05 ,
         output_dir=outdir)
@@ -54,7 +63,7 @@ if __name__ == "__main__":
         return metric.compute(predictions=predictions, references=labels)
 
 
-    trainer = transformers.Trainer(
+    trainer = AdaptedTrainer(
         model=model,
         args=training_args,
         train_dataset=small_train_dataset,
