@@ -6,7 +6,7 @@ if __name__ == "__main__":
     extractor = re.compile(r"report_k(?P<k>\d).csv")
     root_extractor = re.compile(r"reports/(?P<dataset>[^/]+)/(?P<model>.*)/\d.*")
     res = []
-    for root,dirs,files in os.walk("reports"):
+    for root,dirs,files in os.walk("../reports"):
         for file in files:
             m1 = extractor.match(file)
             if m1:

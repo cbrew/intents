@@ -85,7 +85,7 @@ if __name__ == "__main__":
             X_test = X["test"]
 
         date_str = datetime.datetime.now().isoformat()
-        report_dir = os.path.join("reports", dataset_name, model_name, date_str)
+        report_dir = os.path.join("../reports", dataset_name, model_name, date_str)
         if not os.path.exists(report_dir):
             os.makedirs(report_dir)
         for k in range(1, 6):
