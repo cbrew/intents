@@ -16,6 +16,7 @@ class AdaptedTrainer(transformers.Trainer):
             return super().compute_loss(model, inputs, return_outputs=False)
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(

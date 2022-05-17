@@ -1,4 +1,4 @@
-# intents
+# Intents
 
 This repository demonstrates that for at least one intent classification dataset (banking77), the pretraining available in a widely distributed transformer 
 model gets within ~ 1.7% of the accuracy available with extensive fine-tuning. The practical convenience of being able to use a community model 
