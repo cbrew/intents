@@ -64,6 +64,7 @@ def check_bool(s):
 
 
 if __name__ == "__main__":
+    wandb.init(project="intents", entity="cbrew81")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model", type=str, default="sentence-transformers/all-MiniLM-L6-v2"
