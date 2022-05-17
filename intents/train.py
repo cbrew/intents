@@ -9,7 +9,21 @@ from pytorch_metric_learning import losses
 import sys
 import logging
 import torch
-import torch.nn.functional as F
+from pynvml import *
+from sklearn.metrics import f1_score
+
+
+def print_gpu_utilization():
+    nvmlInit()
+    handle = nvmlDeviceGetHandleByIndex(0)
+    info = nvmlDeviceGetMemoryInfo(handle)
+    print(f"GPU memory occupied: {info.used//1024**2} MB.")
+
+
+def print_summary(result):
+    print(f"Time: {result.metrics['train_runtime']:.2f}")
+    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
+    print_gpu_utilization()
 
 
 def mean_pooling(model_output, attention_mask):
@@ -36,14 +50,14 @@ class AdaptedTrainer(transformers.Trainer):
 
         if extra_loss_func is not None:
             loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
-            last_hidden_state = outputs,get("hidden_states")[-1]
+            last_hidden_state = outputs.get("hidden_states")[-1]
             # last_hidden_state is of shape (batch_size, sequence_length, hidden_size).
             # we might like to use mean pooling, but I can't see how to do this generically
             # so we use CLS pooling
 
             # cls_representation is of shape (batch_size,hidden_size)
             cls_representation = last_hidden_state[:, 0, :]
-            extra_loss = extra_loss_func(cls_representation,inputs,get("labels"))
+            extra_loss = extra_loss_func(cls_representation,inputs.get("labels"))
             loss += extra_loss
             if return_outputs:
                 return loss, outputs
@@ -115,17 +129,22 @@ if __name__ == "__main__":
         seed=args.seed,
         per_device_eval_batch_size=args.batch_size,
         per_device_train_batch_size=args.batch_size,
+        eval_accumulation_steps=4,
+        gradient_accumulation_steps=4,
+        gradient_checkpointing=True,
         save_total_limit=5,
         warmup_ratio=0.05,
         output_dir=outdir,
     )
 
-    metric = load_metric("accuracy")
 
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        predictions = np.argmax(logits, axis=-1)
-        return metric.compute(predictions=predictions, references=labels)
+    def compute_metrics(p: EvalPrediction):
+        logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        preds = np.argmax(logits, axis=1)
+        macro_f1 = f1_score(y_true=p.label_ids, y_pred=preds, average='macro', zero_division=0)
+        micro_f1 = f1_score(y_true=p.label_ids, y_pred=preds, average='micro', zero_division=0)
+        return {'macro-f1': macro_f1, 'micro-f1': micro_f1}
+
 
     trainer = AdaptedTrainer(
         model=model,
