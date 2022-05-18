@@ -61,11 +61,11 @@ class AdaptedTrainer(transformers.Trainer):
             extra_loss = extra_loss_func(cls_representation,inputs.get("labels"))
 
             # measures to avoid GPU memory leak
-            loss += float(extra_loss)
+            loss += extra_loss
             # don't need the temporaries.
+            del last_hidden_state
             del cls_representation
             del extra_loss
-            del extra_loss_func
             if return_outputs:
                 return loss, outputs
             else:
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         save_strategy="epoch",
         save_steps=5000,
         seed=args.seed,
-        per_device_eval_batch_size=args.batch_size,
+        per_device_eval_batch_size=max(16, args.batch_size),
         per_device_train_batch_size=args.batch_size,
         eval_accumulation_steps=4,
         gradient_accumulation_steps=4,
