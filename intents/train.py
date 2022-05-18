@@ -133,7 +133,6 @@ if __name__ == "__main__":
         per_device_train_batch_size=args.batch_size,
         eval_accumulation_steps=4,
         gradient_accumulation_steps=4,
-        gradient_checkpointing=True,
         save_total_limit=5,
         warmup_ratio=0.05,
         output_dir=outdir,
