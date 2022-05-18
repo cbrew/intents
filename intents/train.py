@@ -140,7 +140,7 @@ if __name__ == "__main__":
     )
 
 
-    def compute_metrics(p: EvalPrediction):
+    def compute_metrics(p: transformers.EvalPrediction):
         logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
         preds = np.argmax(logits, axis=1)
         macro_f1 = f1_score(y_true=p.label_ids, y_pred=preds, average='macro', zero_division=0)
