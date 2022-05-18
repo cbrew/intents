@@ -84,6 +84,7 @@ if __name__ == "__main__":
         "--model", type=str, default="sentence-transformers/all-MiniLM-L6-v2"
     )
     parser.add_argument("--dataset", type=str, default="banking77")
+    parser.add_argument("--task", type=str, default=None)
     parser.add_argument("--seed", type=int, default=12)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_epochs", type=int, default=40)
@@ -100,7 +101,8 @@ if __name__ == "__main__":
     wandb.init(project="intents")
     model_name = args.model
     dataset_name = args.dataset
-    dataset = datasets.load_dataset(dataset_name)
+    dataset = datasets.load_dataset(dataset_name) if args.task is None else datasets.load_dataset(dataset_name,
+                                                                                                  args.task)
     labels = dataset["train"].features["label"].names
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
     model = transformers.AutoModelForSequenceClassification.from_pretrained(
