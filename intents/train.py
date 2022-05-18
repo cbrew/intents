@@ -65,7 +65,6 @@ class AdaptedTrainer(transformers.Trainer):
             # don't need the temporaries.
             del last_hidden_state
             del cls_representation
-            del extra_loss
             if return_outputs:
                 return loss, outputs
             else:
