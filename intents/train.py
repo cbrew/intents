@@ -57,8 +57,15 @@ class AdaptedTrainer(transformers.Trainer):
 
             # cls_representation is of shape (batch_size,hidden_size)
             cls_representation = last_hidden_state[:, 0, :]
+
             extra_loss = extra_loss_func(cls_representation,inputs.get("labels"))
-            loss += extra_loss
+
+            # measures to avoid GPU memory leak
+            loss += float(extra_loss)
+            # don't need the temporaries.
+            del cls_representation
+            del extra_loss
+            del extra_loss_func
             if return_outputs:
                 return loss, outputs
             else:
