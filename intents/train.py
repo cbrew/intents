@@ -9,7 +9,6 @@ from pytorch_metric_learning import losses
 import sys
 import logging
 import torch
-from pynvml import *
 from sklearn.metrics import f1_score
 
 
