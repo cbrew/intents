@@ -9,8 +9,20 @@ from pytorch_metric_learning import losses
 import sys
 import logging
 import torch
-
 from sklearn.metrics import f1_score
+
+
+def print_gpu_utilization():
+    nvmlInit()
+    handle = nvmlDeviceGetHandleByIndex(0)
+    info = nvmlDeviceGetMemoryInfo(handle)
+    print(f"GPU memory occupied: {info.used//1024**2} MB.")
+
+
+def print_summary(result):
+    print(f"Time: {result.metrics['train_runtime']:.2f}")
+    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
+    print_gpu_utilization()
 
 
 def mean_pooling(model_output, attention_mask):
@@ -85,8 +97,6 @@ if __name__ == "__main__":
     parser.add_argument("--contrastive", type=check_bool, default=False)
     args = parser.parse_args()
 
-    device_count = torch.cuda.device_count()
-
     if args.contrastive and not args.output_hidden_states:
         logging.critical(
             "Contrastive learning requires that the model embeddings are returned"
@@ -124,8 +134,10 @@ if __name__ == "__main__":
         save_strategy="epoch",
         save_steps=5000,
         seed=args.seed,
-        per_device_eval_batch_size=max(16, args.batch_size)/device_count,
-        per_device_train_batch_size=args.batch_size /device_count,
+        per_device_eval_batch_size=max(16, args.batch_size),
+        per_device_train_batch_size=args.batch_size,
+        eval_accumulation_steps=4,
+        gradient_accumulation_steps=4,
         save_total_limit=5,
         warmup_ratio=0.05,
         output_dir=outdir,
