@@ -10,19 +10,8 @@ import sys
 import logging
 import torch
 from sklearn.metrics import f1_score
+from accelerate import Accelerator
 
-
-def print_gpu_utilization():
-    nvmlInit()
-    handle = nvmlDeviceGetHandleByIndex(0)
-    info = nvmlDeviceGetMemoryInfo(handle)
-    print(f"GPU memory occupied: {info.used//1024**2} MB.")
-
-
-def print_summary(result):
-    print(f"Time: {result.metrics['train_runtime']:.2f}")
-    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
-    print_gpu_utilization()
 
 
 def mean_pooling(model_output, attention_mask):
@@ -133,10 +122,13 @@ if __name__ == "__main__":
         evaluation_strategy="epoch",
         save_strategy="epoch",
         save_steps=5000,
+        fp16=True,
         seed=args.seed,
-        per_device_eval_batch_size=int(args.batch_size/torch.cuda.device_count()),
-        per_device_train_batch_size=int(args.batch_size/torch.cuda.device_count()),
+        optim="adafactor",
+        per_device_eval_batch_size=int(args.batch_size),
+        per_device_train_batch_size=int(args.batch_size),
         save_total_limit=5,
+        gradient_checkpointing=True,
         warmup_ratio=0.05,
         output_dir=outdir,
     )
