@@ -3,26 +3,13 @@ import datasets
 import argparse
 import wandb
 import numpy as np
-from datasets import load_metric
 import os
 from pytorch_metric_learning import losses
 import sys
 import logging
 import torch
-from sklearn.metrics import f1_score
-
-
-def print_gpu_utilization():
-    nvmlInit()
-    handle = nvmlDeviceGetHandleByIndex(0)
-    info = nvmlDeviceGetMemoryInfo(handle)
-    print(f"GPU memory occupied: {info.used//1024**2} MB.")
-
-
-def print_summary(result):
-    print(f"Time: {result.metrics['train_runtime']:.2f}")
-    print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
-    print_gpu_utilization()
+from sklearn.metrics import f1_score, accuracy_score
+from accelerate import Accelerator
 
 
 def mean_pooling(model_output, attention_mask):
@@ -34,8 +21,12 @@ def mean_pooling(model_output, attention_mask):
     :return:
     """
     token_embeddings = model_output[0]
-    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+        input_mask_expanded.sum(1), min=1e-9
+    )
 
 
 class AdaptedTrainer(transformers.Trainer):
@@ -44,9 +35,7 @@ class AdaptedTrainer(transformers.Trainer):
         self.contrastive = contrastive
 
     def compute_loss(self, model, inputs, return_outputs=False):
-
         extra_loss_func = losses.SupConLoss() if self.contrastive else None
-
         if extra_loss_func is not None:
             loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
             last_hidden_state = outputs.get("hidden_states")[-1]
@@ -57,7 +46,7 @@ class AdaptedTrainer(transformers.Trainer):
             # cls_representation is of shape (batch_size,hidden_size)
             cls_representation = last_hidden_state[:, 0, :]
 
-            extra_loss = extra_loss_func(cls_representation,inputs.get("labels"))
+            extra_loss = extra_loss_func(cls_representation, inputs.get("labels"))
 
             # measures to avoid GPU memory leak
             loss += extra_loss
@@ -66,9 +55,9 @@ class AdaptedTrainer(transformers.Trainer):
             del cls_representation
             if return_outputs:
                 return loss, outputs
+                del extra_loss_func
             else:
                 return loss
-
         elif extra_loss_func is None and return_outputs:
             loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
 
@@ -90,7 +79,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dataset", type=str, default="banking77")
     parser.add_argument("--task", type=str, default=None)
-    parser.add_argument("--seed", type=int, default=12)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_epochs", type=int, default=40)
     parser.add_argument("--output_hidden_states", type=check_bool, default=False)
@@ -106,8 +95,11 @@ if __name__ == "__main__":
     wandb.init(project="intents")
     model_name = args.model
     dataset_name = args.dataset
-    dataset = datasets.load_dataset(dataset_name) if args.task is None else datasets.load_dataset(dataset_name,
-                                                                                                  args.task)
+    dataset = (
+        datasets.load_dataset(dataset_name)
+        if args.task is None
+        else datasets.load_dataset(dataset_name, args.task)
+    )
     labels = dataset["train"].features["label"].names
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
     model = transformers.AutoModelForSequenceClassification.from_pretrained(
@@ -134,21 +126,28 @@ if __name__ == "__main__":
         save_strategy="epoch",
         save_steps=5000,
         seed=args.seed,
-        per_device_eval_batch_size=int(args.batch_size/torch.cuda.device_count()),
-        per_device_train_batch_size=int(args.batch_size/torch.cuda.device_count()),
+        per_device_eval_batch_size=int(
+            args.batch_size / max(torch.cuda.device_count(), 1)
+        ),
+        per_device_train_batch_size=int(
+            args.batch_size / max(torch.cuda.device_count(), 1)
+        ),
         save_total_limit=5,
         warmup_ratio=0.05,
         output_dir=outdir,
     )
 
-
     def compute_metrics(p: transformers.EvalPrediction):
         logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
         preds = np.argmax(logits, axis=1)
-        macro_f1 = f1_score(y_true=p.label_ids, y_pred=preds, average='macro', zero_division=0)
-        micro_f1 = f1_score(y_true=p.label_ids, y_pred=preds, average='micro', zero_division=0)
-        return {'macro-f1': macro_f1, 'micro-f1': micro_f1}
-
+        macro_f1 = f1_score(
+            y_true=p.label_ids, y_pred=preds, average="macro", zero_division=0
+        )
+        micro_f1 = f1_score(
+            y_true=p.label_ids, y_pred=preds, average="micro", zero_division=0
+        )
+        accuracy = accuracy_score(y_true=p.label_ids, y_pred=preds)
+        return {"macro-f1": macro_f1, "micro-f1": micro_f1, "accuracy": accuracy_score}
 
     trainer = AdaptedTrainer(
         model=model,
