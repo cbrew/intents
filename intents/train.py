@@ -11,6 +11,8 @@ import torch
 from sklearn.metrics import f1_score, accuracy_score
 from accelerate import Accelerator
 
+from intents.trainer import MultilabelTrainer
+
 
 def mean_pooling(model_output, attention_mask):
     """
@@ -72,6 +74,8 @@ def check_bool(s):
 
 
 if __name__ == "__main__":
+    multi_label_tasks = {"ecthr_a", "ecthr_b", "eurlex", "unfair_tos"}
+
     wandb.init(project="intents", entity="cbrew81")
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -137,7 +141,7 @@ if __name__ == "__main__":
         output_dir=outdir,
     )
 
-    def compute_metrics(p: transformers.EvalPrediction):
+    def compute_metrics_multiclass(p: transformers.EvalPrediction):
         logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
         preds = np.argmax(logits, axis=1)
         macro_f1 = f1_score(
@@ -149,12 +153,41 @@ if __name__ == "__main__":
         accuracy = accuracy_score(y_true=p.label_ids, y_pred=preds)
         return {"macro-f1": macro_f1, "micro-f1": micro_f1, "accuracy": accuracy_score}
 
-    trainer = AdaptedTrainer(
+    def compute_metrics_multiliabel(p: transformers.EvalPrediction):
+        # Fix gold labels
+        y_true = np.zeros(
+            (p.label_ids.shape[0], p.label_ids.shape[1] + 1), dtype=np.int32
+        )
+        y_true[:, :-1] = p.label_ids
+        y_true[:, -1] = (np.sum(p.label_ids, axis=1) == 0).astype("int32")
+        # Fix predictions
+        logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        preds = (expit(logits) > 0.5).astype("int32")
+        y_pred = np.zeros(
+            (p.label_ids.shape[0], p.label_ids.shape[1] + 1), dtype=np.int32
+        )
+        y_pred[:, :-1] = preds
+        y_pred[:, -1] = (np.sum(preds, axis=1) == 0).astype("int32")
+        # Compute scores
+        macro_f1 = f1_score(
+            y_true=y_true, y_pred=y_pred, average="macro", zero_division=0
+        )
+        micro_f1 = f1_score(
+            y_true=y_true, y_pred=y_pred, average="micro", zero_division=0
+        )
+        return {"macro-f1": macro_f1, "micro-f1": micro_f1}
+
+    TrainerClass = (
+        MultilabelTrainer if args.task in multi_label_tasks else AdaptedTrainer
+    )
+    trainer = TrainerClass(
         model=model,
         args=training_args,
         train_dataset=small_train_dataset,
         eval_dataset=small_eval_dataset,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_multiliabel
+        if args.task in multi_label_tasks
+        else compute_metrics_multiclass,
         contrastive=args.contrastive,
     )
 
